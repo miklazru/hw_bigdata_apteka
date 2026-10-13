@@ -1,0 +1,4 @@
+pgdata/
+*.dump
+__pycache__/
+.venv/
