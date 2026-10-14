@@ -2,3 +2,7 @@ pgdata/
 *.dump
 __pycache__/
 .venv/
+*.tar.gz
+*.zip
+*:Zone.Identifier
+.sub_local.yaml
