@@ -1,0 +1,63 @@
+# hw01_submission.yaml - манифест сдачи ДЗ №1 (лежит в корне репозитория)
+team:
+  members:
+    - "Новиков Матвей"          # TODO: проверь ФИО
+  github_logins:
+    - "miklazru"
+  solo: true
+
+entrypoint:
+  up: "docker compose up -d"
+  wait_ready: "./scripts/wait_ready.sh"
+  seed: "./scripts/seed.sh --seed 42"                      # TODO: генератор
+  seed_delta: "./scripts/seed.sh --seed 777 --receipts 500"
+  down: "docker compose down -v"
+
+# TODO: master/writer переключим на PgBouncer (6432), replica - на 5433,
+#       когда поднимем часть 2. Пока - напрямую в мастер.
+connections:
+  master:
+    crm:     "postgresql://checker:checker@localhost:5432/crm_service_db"
+    catalog: "postgresql://checker:checker@localhost:5432/catalog_service_db"
+    pos:     "postgresql://checker:checker@localhost:5432/pos_service_db"
+    wms:     "postgresql://checker:checker@localhost:5432/wms_service_db"
+  admin:
+    crm:     "postgresql://postgres:postgres@localhost:5432/crm_service_db"
+    catalog: "postgresql://postgres:postgres@localhost:5432/catalog_service_db"
+    pos:     "postgresql://postgres:postgres@localhost:5432/pos_service_db"
+    wms:     "postgresql://postgres:postgres@localhost:5432/wms_service_db"
+  writer:
+    crm:     "postgresql://app:app@localhost:5432/crm_service_db"
+    catalog: "postgresql://app:app@localhost:5432/catalog_service_db"
+    pos:     "postgresql://app:app@localhost:5432/pos_service_db"
+    wms:     "postgresql://app:app@localhost:5432/wms_service_db"
+
+# SQLSTATE проверены экспериментально (см. вывод чекера, секция inv)
+invariants:
+  I1:  {service: catalog, file: "tests/invariants/I1_bk_unique.sql",       expect_sqlstate: "23505"}
+  I2:  {service: catalog, file: "tests/invariants/I2_bk_immutable.sql",    expect_sqlstate: "P0001"}
+  I3:  {service: pos,     file: "tests/invariants/I3_receipt_total.sql",   expect_sqlstate: "P0001"}
+  I4:  {service: pos,     file: "tests/invariants/I4_line_math.sql",       expect_sqlstate: "23514"}
+  I5:  {service: catalog, file: "tests/invariants/I5_price_overlap.sql",   expect_sqlstate: "23P01"}
+  I6:  {service: crm,     file: "tests/invariants/I6_single_current.sql",  expect_sqlstate: "23505"}
+  I7:  {service: wms,     file: "tests/invariants/I7_stock_negative.sql",  expect_sqlstate: "23514"}
+  I8:  {service: pos,     file: "tests/invariants/I8_sell_expired.sql",    expect_sqlstate: "P0001"}
+  I9:  {service: wms,     file: "tests/invariants/I9_receive_expired.sql", expect_sqlstate: "P0001"}
+  I10: {service: pos,     file: "tests/invariants/I10_rx_no_script.sql",   expect_sqlstate: "23514"}
+  I11: {service: pos,     file: "tests/invariants/I11_refund_excess.sql",  expect_sqlstate: "P0001"}
+  I12: {service: pos,     file: "tests/invariants/I12_payment_total.sql",  expect_sqlstate: "P0001"}
+
+positive_tests:
+  P1: {service: catalog, file: "tests/invariants/P1_updated_at.sql"}
+  P2: {service: crm,     file: "tests/invariants/P2_soft_delete.sql"}
+
+ha:
+  mode: "none"          # TODO: replica -> patroni
+  journal: "docs/failover_journal.md"
+
+docs:
+  readme: "README.md"
+  erd: "docs/erd/"
+  adr: "docs/adr/"
+  dwh_mapping: "docs/dwh_mapping.md"
+  sources_log: "docs/sources.md"

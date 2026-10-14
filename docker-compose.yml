@@ -1,0 +1,35 @@
+name: apteka108
+
+x-pg: &pg
+  image: postgres:18
+  environment: &pgenv
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    # PG18: PGDATA сменился, VOLUME объявлен на /var/lib/postgresql
+    PGDATA: /var/lib/postgresql/18/docker
+
+services:
+  pg_master:
+    <<: *pg
+    container_name: apteka_pg_master
+    restart: unless-stopped
+    ports: ["5432:5432"]
+    volumes:
+      - master_data:/var/lib/postgresql
+      - ./config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./migrations:/migrations:ro
+      # выполняется один раз, при пустом PGDATA
+      - ./scripts/apply_migrations.sh:/docker-entrypoint-initdb.d/10_apply_migrations.sh:ro
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    healthcheck:
+      # по TCP: во время initdb временный сервер слушает только unix-сокет,
+      # так что healthy наступает только после применения всех миграций
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d wms_service_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+      start_period: 10s
+
+volumes:
+  master_data:
