@@ -134,12 +134,14 @@ CREATE TRIGGER trg_customer_history AFTER UPDATE ON crm.customer
 CREATE FUNCTION crm.forget_customer() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
+    -- updated_at = момент забывания (вне режима backfill триггер всё равно поставит now())
     UPDATE crm.customer_pii
-       SET full_name = NULL, phone = NULL, email = NULL, anonymized_at = NEW.deleted_at
+       SET full_name = NULL, phone = NULL, email = NULL, anonymized_at = NEW.deleted_at,
+           updated_at = NEW.deleted_at
      WHERE customer_id = NEW.customer_id;
-    UPDATE crm.consent SET revoked_at = NEW.deleted_at
+    UPDATE crm.consent SET revoked_at = NEW.deleted_at, updated_at = NEW.deleted_at
      WHERE customer_id = NEW.customer_id AND revoked_at IS NULL AND granted_at < NEW.deleted_at;
-    UPDATE crm.loyalty_card SET status = 'closed', closed_at = NEW.deleted_at
+    UPDATE crm.loyalty_card SET status = 'closed', closed_at = NEW.deleted_at, updated_at = NEW.deleted_at
      WHERE customer_id = NEW.customer_id AND closed_at IS NULL;
     RETURN NULL;
 END $$;

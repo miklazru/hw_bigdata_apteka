@@ -60,3 +60,17 @@ INSERT INTO ref.region (region_code, region_name) VALUES
     ('RU-BU','Республика Бурятия'),
     ('RU-KHA','Хабаровский край'), ('RU-PRI','Приморский край'), ('RU-SA','Республика Саха (Якутия)'),
     ('RU-SAK','Сахалинская область');
+
+-- Журнал запусков генератора: делает seed идемпотентным
+-- (повторный запуск с тем же ключом ничего не меняет).
+CREATE TABLE ref.seed_log (
+    run_key     text PRIMARY KEY,          -- 'base:seed=42:as_of=2026-10-15' / 'delta:...'
+    kind        text NOT NULL CHECK (kind IN ('base','delta')),
+    seed        int  NOT NULL,
+    as_of       date NOT NULL,
+    details     text,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE TRIGGER trg_seed_log_updated_at BEFORE UPDATE ON ref.seed_log
+    FOR EACH ROW EXECUTE FUNCTION ref.set_updated_at();
