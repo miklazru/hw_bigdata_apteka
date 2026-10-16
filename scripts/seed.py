@@ -17,7 +17,7 @@
     клиентам, которые есть в CRM.
 
 Подключение: переменные окружения SEED_DB_HOST/PORT/USER/PASSWORD
-(по умолчанию localhost:5432 postgres/postgres - напрямую в мастер).
+(по умолчанию localhost:5000 postgres/postgres - HAProxy, порт записи -> текущий лидер).
 """
 import argparse
 import io
@@ -909,7 +909,7 @@ def stage(cur, name, cols, rows):
 
 def connect(db):
     return psycopg2.connect(host=os.environ.get("SEED_DB_HOST", "localhost"),
-                            port=int(os.environ.get("SEED_DB_PORT", "5432")),
+                            port=int(os.environ.get("SEED_DB_PORT", "5000")),
                             user=os.environ.get("SEED_DB_USER", "postgres"),
                             password=os.environ.get("SEED_DB_PASSWORD", "postgres"),
                             dbname=db)

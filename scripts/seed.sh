@@ -3,7 +3,7 @@
 #   ./scripts/seed.sh --seed 42                      базовая загрузка (~13 мес. истории)
 #   ./scripts/seed.sh --seed 777 --receipts 500      догенерация поверх существующих данных
 # Подключение: SEED_DB_HOST / SEED_DB_PORT / SEED_DB_USER / SEED_DB_PASSWORD
-# (по умолчанию localhost:5432, postgres/postgres - напрямую в мастер).
+# (по умолчанию localhost:5000 - HAProxy, порт записи -> текущий лидер Patroni).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY=python3

@@ -1,35 +1,140 @@
 name: apteka108
 
-x-pg: &pg
-  image: postgres:18
-  environment: &pgenv
-    POSTGRES_USER: postgres
-    POSTGRES_PASSWORD: postgres
-    # PG18: PGDATA сменился, VOLUME объявлен на /var/lib/postgresql
-    PGDATA: /var/lib/postgresql/18/docker
+# HA-кластер: 3 узла PostgreSQL 18 под Patroni + etcd + HAProxy + PgBouncer.
+#
+#   приложение / чекер -> PgBouncer :6432 -> HAProxy :5000 -> лидер
+#                                            HAProxy :5001 -> реплики
+#
+# Порты на хосте:
+#   6432  PgBouncer (пул, запись)        5000  HAProxy -> лидер
+#   5001  HAProxy -> реплики (чтение)    7000  HAProxy, статистика (http)
+#   8008/8009/8010  Patroni REST API pg1/pg2/pg3
+#   5441/5442/5443  узлы напрямую (отладка)    2379  etcd
+
+x-patroni: &patroni
+  build: ./docker/patroni
+  image: apteka108-patroni:4.1.5-pg18
+  user: postgres
+  restart: unless-stopped
+  environment: &patroni-env
+    PATRONI_SUPERUSER_USERNAME: postgres
+    PATRONI_SUPERUSER_PASSWORD: postgres
+    PATRONI_REPLICATION_USERNAME: replicator
+    PATRONI_REPLICATION_PASSWORD: replicator
+    PATRONI_RESTAPI_USERNAME: patroni
+    PATRONI_RESTAPI_PASSWORD: patroni
+  depends_on:
+    etcd: { condition: service_healthy }
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8008/health >/dev/null"]
+    interval: 5s
+    timeout: 3s
+    retries: 60
+    start_period: 20s
 
 services:
-  pg_master:
-    <<: *pg
-    container_name: apteka_pg_master
-    restart: unless-stopped
-    ports: ["5432:5432"]
-    volumes:
-      - master_data:/var/lib/postgresql
-      - ./config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-      - ./config/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
-      - ./migrations:/migrations:ro
-      # выполняется один раз, при пустом PGDATA
-      - ./scripts/apply_migrations.sh:/docker-entrypoint-initdb.d/10_apply_migrations.sh:ro
-    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.21
+    container_name: apteka_etcd
+    environment:
+      ETCD_NAME: etcd0
+      ETCD_DATA_DIR: /etcd-data
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd:2380
+      ETCD_INITIAL_CLUSTER: etcd0=http://etcd:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ETCD_INITIAL_CLUSTER_TOKEN: apteka108-etcd
+    networks: { dbnet: { ipv4_address: 10.42.0.2 } }
+    ports: ["2379:2379"]
     healthcheck:
-      # по TCP: во время initdb временный сервер слушает только unix-сокет,
-      # так что healthy наступает только после применения всех миграций
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d wms_service_db"]
-      interval: 3s
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
       timeout: 3s
-      retries: 60
-      start_period: 10s
+      retries: 20
+
+  pg1:
+    <<: *patroni
+    container_name: apteka_pg1
+    hostname: pg1
+    environment:
+      <<: *patroni-env
+      PATRONI_NAME: pg1
+      PATRONI_RESTAPI_CONNECT_ADDRESS: pg1:8008
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: pg1:5432
+    volumes:
+      - pg1_data:/var/lib/postgresql
+      - ./migrations:/migrations:ro
+      - ./scripts/apply_migrations.sh:/scripts/apply_migrations.sh:ro
+      - ./scripts/post_bootstrap.sh:/scripts/post_bootstrap.sh:ro
+    networks: { dbnet: { ipv4_address: 10.42.0.11 } }
+    ports: ["5441:5432", "8008:8008"]
+
+  pg2:
+    <<: *patroni
+    container_name: apteka_pg2
+    hostname: pg2
+    environment:
+      <<: *patroni-env
+      PATRONI_NAME: pg2
+      PATRONI_RESTAPI_CONNECT_ADDRESS: pg2:8008
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: pg2:5432
+    volumes:
+      - pg2_data:/var/lib/postgresql
+      - ./migrations:/migrations:ro
+      - ./scripts/apply_migrations.sh:/scripts/apply_migrations.sh:ro
+      - ./scripts/post_bootstrap.sh:/scripts/post_bootstrap.sh:ro
+    networks: { dbnet: { ipv4_address: 10.42.0.12 } }
+    ports: ["5442:5432", "8009:8008"]
+
+  pg3:
+    <<: *patroni
+    container_name: apteka_pg3
+    hostname: pg3
+    environment:
+      <<: *patroni-env
+      PATRONI_NAME: pg3
+      PATRONI_RESTAPI_CONNECT_ADDRESS: pg3:8008
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: pg3:5432
+    volumes:
+      - pg3_data:/var/lib/postgresql
+      - ./migrations:/migrations:ro
+      - ./scripts/apply_migrations.sh:/scripts/apply_migrations.sh:ro
+      - ./scripts/post_bootstrap.sh:/scripts/post_bootstrap.sh:ro
+    networks: { dbnet: { ipv4_address: 10.42.0.13 } }
+    ports: ["5443:5432", "8010:8008"]
+
+  haproxy:
+    image: haproxy:3.2-alpine
+    container_name: apteka_haproxy
+    restart: unless-stopped
+    depends_on: [pg1, pg2, pg3]
+    volumes:
+      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks: { dbnet: { ipv4_address: 10.42.0.20 } }
+    ports: ["5000:5000", "5001:5001", "7000:7000"]
+
+  pgbouncer:
+    image: edoburu/pgbouncer:v1.25.2-p0
+    container_name: apteka_pgbouncer
+    restart: unless-stopped
+    depends_on: [haproxy]
+    volumes:
+      - ./config/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./config/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    networks: { dbnet: { ipv4_address: 10.42.0.21 } }
+    ports: ["6432:6432"]
+
+networks:
+  dbnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.42.0.0/16
+          gateway: 10.42.0.1
 
 volumes:
-  master_data:
+  pg1_data:
+  pg2_data:
+  pg3_data:

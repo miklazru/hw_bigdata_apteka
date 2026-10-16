@@ -1,0 +1,68 @@
+# Конфиг узла Patroni. Имя узла и адреса приходят из переменных окружения
+# (PATRONI_NAME, PATRONI_*_CONNECT_ADDRESS) - см. docker-compose.yml.
+scope: apteka108
+
+etcd3:
+  hosts: etcd:2379
+
+# сторожевой таймер ОС в Docker недоступен (в проде на VM/железе - включают)
+watchdog:
+  mode: off
+
+restapi:
+  listen: 0.0.0.0:8008
+
+bootstrap:
+  # применяется ОДИН раз при инициализации кластера, дальше живёт в etcd
+  # (менять: patronictl edit-config)
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576       # 1 МБ: отставшую реплику в лидеры не берём
+    synchronous_mode: false                # асинхронная репликация (см. журнал, Э5)
+    postgresql:
+      use_pg_rewind: true                  # быстрый возврат бывшего лидера (нужны checksums)
+      use_slots: true                      # физические слоты под каждую реплику
+      parameters:
+        wal_level: logical                 # CDC для ДЗ2 (logical > replica, физике тоже годится)
+        max_connections: 100
+        max_wal_senders: 10
+        max_replication_slots: 10
+        wal_keep_size: 128MB
+        max_slot_wal_keep_size: 1GB
+        hot_standby: 'on'
+        hot_standby_feedback: 'on'
+        password_encryption: scram-sha-256
+        timezone: UTC
+        log_timezone: UTC
+
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+    - auth-host: scram-sha-256
+
+  # Схема четырёх баз создаётся один раз, на первом лидере, сразу после initdb.
+  # Реплики получают её физической репликацией.
+  post_bootstrap: /scripts/post_bootstrap.sh
+
+postgresql:
+  data_dir: /var/lib/postgresql/18/data
+  bin_dir: /usr/lib/postgresql/18/bin
+  listen: 0.0.0.0:5432
+  pgpass: /tmp/pgpass
+  # реплика клонируется pg_basebackup; fast - не ждать плановую контрольную точку
+  # (по умолчанию spread: первая реплика ждала бы до checkpoint_timeout = 5 мин)
+  basebackup:
+    - checkpoint: fast
+  pg_hba:
+    - local   all             all                                     trust
+    - host    all             all             127.0.0.1/32            trust
+    - host    all             all             10.42.0.0/16            scram-sha-256
+    - host    replication     replicator      10.42.0.0/16            scram-sha-256
+
+tags:
+  nofailover: false
+  noloadbalance: false
+  clonefrom: false
+  nosync: false

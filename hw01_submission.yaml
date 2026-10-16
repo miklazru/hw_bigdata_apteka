@@ -9,28 +9,34 @@ team:
 entrypoint:
   up: "docker compose up -d"
   wait_ready: "./scripts/wait_ready.sh"
-  seed: "./scripts/seed.sh --seed 42"                      # TODO: генератор
+  seed: "./scripts/seed.sh --seed 42"
   seed_delta: "./scripts/seed.sh --seed 777 --receipts 500"
   down: "docker compose down -v"
 
-# TODO: master/writer переключим на PgBouncer (6432), replica - на 5433,
-#       когда поднимем часть 2. Пока - напрямую в мастер.
+# Все подключения идут через точки входа кластера, а не в конкретный узел:
+#   6432 PgBouncer -> HAProxy:5000 -> текущий лидер Patroni
+#   5000 HAProxy, порт записи (лидер)        5001 HAProxy, порт чтения (реплики)
 connections:
-  master:
-    crm:     "postgresql://checker:checker@localhost:5432/crm_service_db"
-    catalog: "postgresql://checker:checker@localhost:5432/catalog_service_db"
-    pos:     "postgresql://checker:checker@localhost:5432/pos_service_db"
-    wms:     "postgresql://checker:checker@localhost:5432/wms_service_db"
-  admin:
-    crm:     "postgresql://postgres:postgres@localhost:5432/crm_service_db"
-    catalog: "postgresql://postgres:postgres@localhost:5432/catalog_service_db"
-    pos:     "postgresql://postgres:postgres@localhost:5432/pos_service_db"
-    wms:     "postgresql://postgres:postgres@localhost:5432/wms_service_db"
-  writer:
-    crm:     "postgresql://app:app@localhost:5432/crm_service_db"
-    catalog: "postgresql://app:app@localhost:5432/catalog_service_db"
-    pos:     "postgresql://app:app@localhost:5432/pos_service_db"
-    wms:     "postgresql://app:app@localhost:5432/wms_service_db"
+  master:      # чекер (только SELECT в contract) - через пул
+    crm:     "postgresql://checker:checker@localhost:6432/crm_service_db"
+    catalog: "postgresql://checker:checker@localhost:6432/catalog_service_db"
+    pos:     "postgresql://checker:checker@localhost:6432/pos_service_db"
+    wms:     "postgresql://checker:checker@localhost:6432/wms_service_db"
+  replica:     # реплики Patroni через HAProxy (порт чтения)
+    crm:     "postgresql://checker:checker@localhost:5001/crm_service_db"
+    catalog: "postgresql://checker:checker@localhost:5001/catalog_service_db"
+    pos:     "postgresql://checker:checker@localhost:5001/pos_service_db"
+    wms:     "postgresql://checker:checker@localhost:5001/wms_service_db"
+  admin:       # суперпользователь на лидере (HAProxy, порт записи)
+    crm:     "postgresql://postgres:postgres@localhost:5000/crm_service_db"
+    catalog: "postgresql://postgres:postgres@localhost:5000/catalog_service_db"
+    pos:     "postgresql://postgres:postgres@localhost:5000/pos_service_db"
+    wms:     "postgresql://postgres:postgres@localhost:5000/wms_service_db"
+  writer:      # негативные тесты - через пул
+    crm:     "postgresql://app:app@localhost:6432/crm_service_db"
+    catalog: "postgresql://app:app@localhost:6432/catalog_service_db"
+    pos:     "postgresql://app:app@localhost:6432/pos_service_db"
+    wms:     "postgresql://app:app@localhost:6432/wms_service_db"
 
 # SQLSTATE проверены экспериментально (см. вывод чекера, секция inv)
 invariants:
@@ -52,7 +58,12 @@ positive_tests:
   P2: {service: crm,     file: "tests/invariants/P2_soft_delete.sql"}
 
 ha:
-  mode: "none"          # TODO: replica -> patroni
+  mode: "patroni"
+  pooler_dsn: "postgresql://checker:checker@localhost:6432/pos_service_db"
+  haproxy_rw_dsn: "postgresql://checker:checker@localhost:5000/pos_service_db"
+  haproxy_ro_dsn: "postgresql://checker:checker@localhost:5001/pos_service_db"
+  patroni_api: "http://localhost:8008"
+  expected_members: 3
   journal: "docs/failover_journal.md"
 
 docs:

@@ -22,6 +22,8 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'checker') THEN
         CREATE ROLE checker LOGIN PASSWORD 'checker';        -- только чтение contract
     END IF;
+    -- чтение pg_stat_wal_receiver / pg_stat_replication для мониторинга реплики
+    GRANT pg_read_all_stats TO checker;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'replicator') THEN
         CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD 'replicator';
     END IF;
