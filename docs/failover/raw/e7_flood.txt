@@ -1,0 +1,25 @@
+=== e7_flood  2026-10-17 01:34:01 MSK  host=MatveyNovikov
+100
+3
+
+[01:34:01.600] >>> БЕЗ пула: HAProxy :5000 -> лидер, каждый клиент держит транзакцию 1 c
+flood: localhost:5000/ha_lab, каждый клиент держит транзакцию 1.0 c
+ клиентов | успешно | ошибок |  connect медиана/max, мс | время, c | первая ошибка
+       20 |      20 |      0 |                    29/33 |      1.0 | 
+       50 |      50 |      0 |                    50/64 |      1.1 | 
+       90 |      90 |      0 |                   92/124 |      1.1 | 
+      100 |      94 |      6 |                   82/127 |      1.1 | connection to server at "localhost" (127.0.0.1), port 5000 failed: FATAL:  remaining connection slots are reserved for roles with the SUPERUSER attribute
+      150 |      94 |     56 |                  110/161 |      1.2 | connection to server at "localhost" (127.0.0.1), port 5000 failed: FATAL:  remaining connection slots are reserved for roles with the SUPERUSER attribute
+      300 |      94 |    206 |                  169/254 |      1.3 | connection to server at "localhost" (127.0.0.1), port 5000 failed: FATAL:  sorry, too many clients already
+      500 |      94 |    406 |                   73/164 |      1.4 | connection to server at "localhost" (127.0.0.1), port 5000 failed: FATAL:  sorry, too many clients already
+
+[01:34:24.256] >>> С пулом: PgBouncer :6432 (default_pool_size=20, transaction pooling)
+flood: localhost:6432/ha_lab, каждый клиент держит транзакцию 1.0 c
+ клиентов | успешно | ошибок |  connect медиана/max, мс | время, c | первая ошибка
+       20 |      20 |      0 |                      3/5 |      1.2 | 
+       50 |      50 |      0 |                    12/32 |      3.0 | 
+       90 |      90 |      0 |                     6/19 |      5.0 | 
+      100 |     100 |      0 |                     8/22 |      4.1 | 
+      150 |     150 |      0 |                    14/43 |      6.1 | 
+      300 |     300 |      0 |                    20/69 |     12.1 | 
+      500 |     500 |      0 |                      2/7 |     20.1 | 

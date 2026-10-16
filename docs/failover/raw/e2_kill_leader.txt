@@ -1,0 +1,103 @@
+=== e2_kill_leader  2026-10-17 01:29:12 MSK  host=MatveyNovikov
+
+[01:29:12.362] >>> до аварии
++ Cluster: apteka108 (7697390056828444704) +-------------+-----+------------+-----+
+| Member | Host | Role    | State     | TL | Receive LSN | Lag | Replay LSN | Lag |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+| pg1    | pg1  | Replica | streaming |  8 |  0/16E879C0 |   0 | 0/16E879C0 |   0 |
+| pg2    | pg2  | Leader  | running   |  8 |             |     |            |     |
+| pg3    | pg3  | Replica | streaming |  8 |  0/16E879C0 |   0 | 0/16E879C0 |   0 |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+лидер: pg2
+
+[01:29:33.489] >>> docker kill apteka_pg2
+apteka_pg2
+writeloop: 25946 attempts -> docs/failover/raw/e2_kill_leader_writeloop.csv
+
+[01:30:43.541] >>> результат write-loop
+файл: docs/failover/raw/e2_kill_leader_writeloop.csv
+интервал: 01:29:13.529 - 01:30:43.530 (90.0 c)
+попыток: 25946, успешных: 25945, ошибок: 1
+TPS (успешные / длительность): 288.3
+задержка записи: медиана 2.3 мс, p95 2.8 мс, max 26264.0 мс
+узлы, обслужившие запись (по порядку): 10.42.0.12/32 (7285) -> 10.42.0.13/32 (18660)
+
+окно недоступности #1:
+  последняя успешная запись:   01:29:33.855  id=176751 узел=10.42.0.12/32
+  первая ошибка:               01:29:33.855  server closed the connection unexpectedly
+  первая успешная после:       01:30:00.332  id=176760 узел=10.42.0.13/32
+  отклонённых попыток: 1
+       1 x server closed the connection unexpectedly
+  RTO (окно недоступности записи): 26.48 c
+
+подтверждённых транзакций: 25945, найдено в базе после теста: 25945, потеряно: 0
+  max(id) в базе: 195419; max подтверждённый id: 195419
+
+[01:30:43.784] >>> новый лидер: pg3
++ Cluster: apteka108 (7697390056828444704) +-------------+-----+------------+-----+
+| Member | Host | Role    | State     | TL | Receive LSN | Lag | Replay LSN | Lag |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+| pg1    | pg1  | Replica | streaming |  9 |  0/173711C0 |   0 | 0/173710F0 |   0 |
+| pg3    | pg3  | Leader  | running   |  9 |             |     |            |     |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+
+[01:30:44.430] >>> лог Patroni нового лидера (pg3) с момента kill
+2026-10-16 22:29:33.866 UTC [229] FATAL:  could not receive data from WAL stream: server closed the connection unexpectedly
+2026-10-16 22:29:33.866 UTC [69] LOG:  invalid record length at 0/17016908: expected at least 24, got 0
+2026-10-16 22:29:33.871 UTC [897] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: connection to server at "pg2" (10.42.0.12), port 5432 failed: Connection refused
+2026-10-16 22:29:33.871 UTC [69] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:38.901 UTC [905] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: could not translate host name "pg2" to address: Name or service not known
+2026-10-16 22:29:38.902 UTC [69] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:43.912 UTC [913] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: could not translate host name "pg2" to address: Name or service not known
+2026-10-16 22:29:43.912 UTC [69] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:48.945 UTC [921] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: could not translate host name "pg2" to address: Name or service not known
+2026-10-16 22:29:48.945 UTC [69] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:53.921 UTC [929] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: could not translate host name "pg2" to address: Name or service not known
+2026-10-16 22:29:53.921 UTC [69] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:56,266 WARNING: failed to resolve host pg2: [Errno -2] Name or service not known
+2026-10-16 22:29:56,267 WARNING: Request failed to pg2: GET http://pg2:8008/patroni (HTTPConnectionPool(host='pg2', port=8008): Max retries exceeded with url: /patroni (Caused by NewConnectionError("HTTPConnection(host='pg2', port=8008): Failed to establish a new connection: getaddrinfo returns an empty list")))
+2026-10-16 22:29:56,274 INFO: Got response from pg1 http://pg1:8008/patroni: {"state": "running", "postmaster_start_time": "2026-10-16 22:18:10.813593+00:00", "role": "replica", "server_version": 180006, "xlog": {"received_location": 385968392, "replayed_location": 385968392, "replayed_timestamp": "2026-10-16 22:29:33.851202+00:00", "paused": false}, "timeline": 8, "cluster_unlocked": true, "dcs_last_seen": 1792189796, "database_system_identifier": "7697390056828444704", "patroni": {"version": "4.1.5", "scope": "apteka108", "name": "pg1"}}
+2026-10-16 22:29:56,464 INFO: promoted self to leader by acquiring session lock
+2026-10-16 22:29:56.467 UTC [69] LOG:  received promote request
+2026-10-16 22:29:56.467 UTC [69] LOG:  redo done at 0/170168D8 system usage: CPU: user: 0.65 s, system: 0.62 s, elapsed: 586.13 s
+2026-10-16 22:29:56.467 UTC [69] LOG:  last completed transaction was at log time 2026-10-16 22:29:33.851202+00
+2026-10-16 22:29:56.487 UTC [69] LOG:  selected new timeline ID: 9
+2026-10-16 22:29:56.551 UTC [69] LOG:  archive recovery complete
+2026-10-16 22:29:56.603 UTC [67] LOG:  checkpoint starting: force
+2026-10-16 22:29:56.610 UTC [62] LOG:  database system is ready to accept connections
+2026-10-16 22:29:57.690 UTC [67] LOG:  checkpoint complete: wrote 98 buffers (0.6%), wrote 5 SLRU buffers; 0 WAL file(s) added, 1 removed, 0 recycled; write=0.960 s, sync=0.055 s, total=1.088 s; sync files=17, longest=0.011 s, average=0.004 s; distance=4832 kB, estimate=11487 kB; lsn=0/17016998, redo lsn=0/17016940
+2026-10-16 22:29:57.691 UTC [67] LOG:  checkpoint starting: immediate force wait
+2026-10-16 22:29:57.729 UTC [67] LOG:  checkpoint complete: wrote 0 buffers (0.0%), wrote 0 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.039 s; sync files=0, longest=0.000 s, average=0.000 s; distance=0 kB, estimate=10338 kB; lsn=0/17016A68, redo lsn=0/17016A10
+
+[01:30:44.873] >>> лог Patroni второй реплики (pg1)
+2026-10-16 22:29:33.866 UTC [502] FATAL:  could not receive data from WAL stream: server closed the connection unexpectedly
+2026-10-16 22:29:33.866 UTC [52] LOG:  invalid record length at 0/17016908: expected at least 24, got 0
+2026-10-16 22:29:33.871 UTC [1271] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: connection to server at "pg2" (10.42.0.12), port 5432 failed: Connection refused
+2026-10-16 22:29:33.871 UTC [52] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:38.901 UTC [1279] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: could not translate host name "pg2" to address: Name or service not known
+2026-10-16 22:29:38.902 UTC [52] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:43.912 UTC [1287] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: could not translate host name "pg2" to address: Name or service not known
+2026-10-16 22:29:43.913 UTC [52] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:48.944 UTC [1295] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: could not translate host name "pg2" to address: Name or service not known
+2026-10-16 22:29:48.945 UTC [52] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:53.921 UTC [1303] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: could not translate host name "pg2" to address: Name or service not known
+2026-10-16 22:29:53.922 UTC [52] LOG:  waiting for WAL to become available at 0/17016920
+2026-10-16 22:29:56,266 WARNING: failed to resolve host pg2: [Errno -2] Name or service not known
+2026-10-16 22:29:56,274 INFO: Got response from pg3 http://pg3:8008/patroni: {"state": "running", "postmaster_start_time": "2026-10-16 22:20:05.435968+00:00", "role": "replica", "server_version": 180006, "xlog": {"received_location": 385968392, "replayed_location": 385968392, "replayed_timestamp": "2026-10-16 22:29:33.851202+00:00", "paused": false}, "timeline": 8, "cluster_unlocked": true, "dcs_last_seen": 1792189796, "database_system_identifier": "7697390056828444704", "patroni": {"version": "4.1.5", "scope": "apteka108", "name": "pg3"}}
+2026-10-16 22:29:58,272 WARNING: Request failed to pg2: GET http://pg2:8008/patroni (HTTPConnectionPool(host='pg2', port=8008): Max retries exceeded with url: /patroni (Caused by ConnectTimeoutError(<HTTPConnection(host='pg2', port=8008) at 0x7fa01a3606b0>, 'Connection to pg2 timed out. (connect timeout=2)')))
+2026-10-16 22:29:58,388 INFO: Could not take out TTL lock
+2026-10-16 22:29:58,391 ERROR: watchprefix failed: ProtocolError('Response ended prematurely')
+2026-10-16 22:29:58.411 UTC [45] LOG:  received SIGHUP, reloading configuration files
+2026-10-16 22:29:58.413 UTC [45] LOG:  parameter "primary_conninfo" changed to "dbname=postgres user=replicator passfile=/tmp/pgpass host=pg3 port=5432 sslmode=prefer application_name=pg1 gssencmode=prefer channel_binding=prefer sslnegotiation=postgres"
+2026-10-16 22:29:58.436 UTC [1316] LOG:  fetching timeline history file for timeline 9 from primary server
+2026-10-16 22:29:58,438 INFO: following new leader after trying and failing to obtain lock
+2026-10-16 22:29:58,439 INFO: Lock owner: pg3; I am pg1
+2026-10-16 22:29:58,446 INFO: Local timeline=8 lsn=0/17016908
+2026-10-16 22:29:58.452 UTC [1316] LOG:  started streaming WAL from primary at 0/17000000 on timeline 8
+2026-10-16 22:29:58.452 UTC [1316] LOG:  replication terminated by primary server
+
+[01:30:44.959] >>> параметры DCS
+loop_wait: 10
+retry_timeout: 10
+synchronous_mode: false
+ttl: 30

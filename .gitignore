@@ -6,3 +6,7 @@ __pycache__/
 *.zip
 *:Zone.Identifier
 .sub_local.yaml
+docs/failover/raw/*.csv
+docs/failover/raw/.killed_node
+docs/failover/raw/*.csv
+docs/failover/raw/.killed_node

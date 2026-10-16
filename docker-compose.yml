@@ -1,6 +1,6 @@
 name: apteka108
 
-# HA-кластер: 3 узла PostgreSQL 18 под Patroni + etcd + HAProxy + PgBouncer.
+# HA-кластер: 3 узла PostgreSQL 18 под Patroni + etcd (3 узла, кворум) + HAProxy + PgBouncer.
 #
 #   приложение / чекер -> PgBouncer :6432 -> HAProxy :5000 -> лидер
 #                                            HAProxy :5001 -> реплики
@@ -9,7 +9,7 @@ name: apteka108
 #   6432  PgBouncer (пул, запись)        5000  HAProxy -> лидер
 #   5001  HAProxy -> реплики (чтение)    7000  HAProxy, статистика (http)
 #   8008/8009/8010  Patroni REST API pg1/pg2/pg3
-#   5441/5442/5443  узлы напрямую (отладка)    2379  etcd
+#   5441/5442/5443  узлы напрямую (отладка)    2379  etcd1 (кластер etcd из 3 узлов)
 
 x-patroni: &patroni
   build: ./docker/patroni
@@ -24,7 +24,9 @@ x-patroni: &patroni
     PATRONI_RESTAPI_USERNAME: patroni
     PATRONI_RESTAPI_PASSWORD: patroni
   depends_on:
-    etcd: { condition: service_healthy }
+    etcd1: { condition: service_healthy }
+    etcd2: { condition: service_healthy }
+    etcd3: { condition: service_healthy }
   healthcheck:
     test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8008/health >/dev/null"]
     interval: 5s
@@ -32,27 +34,55 @@ x-patroni: &patroni
     retries: 60
     start_period: 20s
 
+x-etcd: &etcd
+  image: quay.io/coreos/etcd:v3.5.21
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "etcdctl", "endpoint", "health"]
+    interval: 5s
+    timeout: 3s
+    retries: 30
+
+x-etcd-env: &etcd-env
+  ETCD_DATA_DIR: /etcd-data
+  ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+  ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+  ETCD_INITIAL_CLUSTER: etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+  ETCD_INITIAL_CLUSTER_STATE: new
+  ETCD_INITIAL_CLUSTER_TOKEN: apteka108-etcd
+
 services:
-  etcd:
-    image: quay.io/coreos/etcd:v3.5.21
-    container_name: apteka_etcd
+  # DCS: кворумный etcd из трёх узлов (переживает потерю одного)
+  etcd1:
+    <<: *etcd
+    container_name: apteka_etcd1
     environment:
-      ETCD_NAME: etcd0
-      ETCD_DATA_DIR: /etcd-data
-      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
-      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
-      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
-      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd:2380
-      ETCD_INITIAL_CLUSTER: etcd0=http://etcd:2380
-      ETCD_INITIAL_CLUSTER_STATE: new
-      ETCD_INITIAL_CLUSTER_TOKEN: apteka108-etcd
+      <<: *etcd-env
+      ETCD_NAME: etcd1
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd1:2379
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd1:2380
     networks: { dbnet: { ipv4_address: 10.42.0.2 } }
     ports: ["2379:2379"]
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
+
+  etcd2:
+    <<: *etcd
+    container_name: apteka_etcd2
+    environment:
+      <<: *etcd-env
+      ETCD_NAME: etcd2
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd2:2379
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd2:2380
+    networks: { dbnet: { ipv4_address: 10.42.0.3 } }
+
+  etcd3:
+    <<: *etcd
+    container_name: apteka_etcd3
+    environment:
+      <<: *etcd-env
+      ETCD_NAME: etcd3
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd3:2379
+      ETCD_INITIAL_ADVERTISE_PEER_URLS: http://etcd3:2380
+    networks: { dbnet: { ipv4_address: 10.42.0.4 } }
 
   pg1:
     <<: *patroni

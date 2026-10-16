@@ -1,0 +1,84 @@
+=== e5_sync_kill  2026-10-17 01:11:17 MSK  host=MatveyNovikov
+
+[01:11:17.805] >>> до аварии
++ Cluster: apteka108 (7697390056828444704) +----+-------------+-----+------------+-----+
+| Member | Host | Role         | State     | TL | Receive LSN | Lag | Replay LSN | Lag |
++--------+------+--------------+-----------+----+-------------+-----+------------+-----+
+| pg1    | pg1  | Leader       | running   |  3 |             |     |            |     |
+| pg2    | pg2  | Sync Standby | streaming |  3 |  0/15260448 |   0 | 0/15260448 |   0 |
+| pg3    | pg3  | Replica      | streaming |  3 |  0/15260448 |   0 | 0/15260448 |   0 |
++--------+------+--------------+-----------+----+-------------+-----+------------+-----+
+лидер: pg1
+
+[01:11:38.619] >>> docker kill apteka_pg1
+apteka_pg1
+writeloop: 11754 attempts -> docs/failover/raw/e5_sync_kill_writeloop.csv
+
+[01:12:48.685] >>> результат write-loop
+файл: docs/failover/raw/e5_sync_kill_writeloop.csv
+интервал: 01:11:18.669 - 01:12:48.671 (90.0 c)
+попыток: 11754, успешных: 11753, ошибок: 1
+TPS (успешные / длительность): 130.6
+задержка записи: медиана 4.8 мс, p95 6.2 мс, max 28265.1 мс
+узлы, обслужившие запись (по порядку): 10.42.0.11/32 (4270) -> 10.42.0.12/32 (7483)
+
+окно недоступности #1:
+  последняя успешная запись:   01:11:38.824  id=79266 узел=10.42.0.11/32
+  первая ошибка:               01:11:38.824  server closed the connection unexpectedly
+  первая успешная после:       01:12:07.298  id=79286 узел=10.42.0.12/32
+  отклонённых попыток: 1
+       1 x server closed the connection unexpectedly
+  RTO (окно недоступности записи): 28.47 c
+
+подтверждённых транзакций: 11753, найдено в базе после теста: 11753, потеряно: 0
+  max(id) в базе: 86768; max подтверждённый id: 86768
+
+[01:12:48.874] >>> новый лидер: pg2
++ Cluster: apteka108 (7697390056828444704) +----+-------------+-----+------------+-----+
+| Member | Host | Role         | State     | TL | Receive LSN | Lag | Replay LSN | Lag |
++--------+------+--------------+-----------+----+-------------+-----+------------+-----+
+| pg2    | pg2  | Leader       | running   |  4 |             |     |            |     |
+| pg3    | pg3  | Sync Standby | streaming |  4 |  0/1551FD90 |   0 | 0/1551FD90 |   0 |
++--------+------+--------------+-----------+----+-------------+-----+------------+-----+
+
+[01:12:50.094] >>> лог Patroni нового лидера (pg2) с момента kill
+2026-10-16 22:11:38.387 UTC [553] FATAL:  no pg_hba.conf entry for replication connection from host "127.0.0.1", user "replicator", no encryption
+2026-10-16 22:11:38,387 ERROR: Can not fetch local timeline and lsn from replication connection
+Traceback (most recent call last):
+  File "/opt/patroni/lib/python3.13/site-packages/patroni/postgresql/__init__.py", line 1119, in get_replica_timeline
+    with self.get_replication_connection_cursor(**self.config.local_replication_address) as cur:
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/opt/patroni/lib/python3.13/site-packages/patroni/postgresql/__init__.py", line 1114, in get_replication_connection_cursor
+    with get_connection_cursor(**conn_kwargs) as cur:
+         ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/opt/patroni/lib/python3.13/site-packages/patroni/postgresql/connection.py", line 164, in get_connection_cursor
+    conn = psycopg.connect(**conn_kwargs)
+  File "/opt/patroni/lib/python3.13/site-packages/patroni/psycopg.py", line 150, in connect
+    ret = _connect(*args, **kwargs)
+  File "/opt/patroni/lib/python3.13/site-packages/patroni/psycopg.py", line 104, in _connect
+    ret: 'Connection[Any]' = __connect(dsn or "", **kwargs)
+                             ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/patroni/lib/python3.13/site-packages/psycopg/connection.py", line 134, in connect
+    raise new_ex.with_traceback(None)
+psycopg.OperationalError: connection failed: connection to server at "127.0.0.1", port 5432 failed: FATAL:  no pg_hba.conf entry for replication connection from host "127.0.0.1", user "replicator", no encryption
+Multiple connection attempts failed. All failures were:
+- host: 'localhost', port: '5432', hostaddr: '::1': connection failed: connection to server at "::1", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+- host: 'localhost', port: '5432', hostaddr: '127.0.0.1': connection failed: connection to server at "127.0.0.1", port 5432 failed: FATAL:  no pg_hba.conf entry for replication connection from host "127.0.0.1", user "replicator", no encryption
+2026-10-16 22:11:38.410 UTC [554] FATAL:  no pg_hba.conf entry for replication connection from host "127.0.0.1", user "replicator", no encryption
+2026-10-16 22:11:38,410 ERROR: Can not fetch local timeline and lsn from replication connection
+Traceback (most recent call last):
+  File "/opt/patroni/lib/python3.13/site-packages/patroni/postgresql/__init__.py", line 1119, in get_replica_timeline
+    with self.get_replication_connection_cursor(**self.config.local_replication_address) as cur:
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/opt/patroni/lib/python3.13/site-packages/patroni/postgresql/__init__.py", line 1114, in get_replication_connection_cursor
+    with get_connection_cursor(**conn_kwargs) as cur:
+         ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)

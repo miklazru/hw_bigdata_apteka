@@ -1,0 +1,74 @@
+=== e0_stand  2026-10-17 01:05:53 MSK  host=MatveyNovikov
+
+[01:05:53.900] >>> машина
+CPU(s):                               16
+Model name:                           12th Gen Intel(R) Core(TM) i7-12650H
+               total        used        free      shared  buff/cache   available
+Mem:           7.6Gi       1.2Gi       3.9Gi       389Mi       2.4Gi       5.7Gi
+/dev/sdc       1007G   78G  879G   9% /
+
+[01:05:53.908] >>> ОС
+Linux 5.15.167.4-microsoft-standard-WSL2 x86_64
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+
+[01:05:53.911] >>> Docker
+Docker version 29.1.5, build 0e6fee6
+Docker Compose version v5.0.2
+
+[01:05:54.038] >>> контейнеры
+NAME               IMAGE                          STATUS                        PORTS
+apteka_etcd1       quay.io/coreos/etcd:v3.5.21    Up About a minute (healthy)   0.0.0.0:2379->2379/tcp, [::]:2379->2379/tcp, 2380/tcp
+apteka_etcd2       quay.io/coreos/etcd:v3.5.21    Up About a minute (healthy)   2379-2380/tcp
+apteka_etcd3       quay.io/coreos/etcd:v3.5.21    Up About a minute (healthy)   2379-2380/tcp
+apteka_haproxy     haproxy:3.2-alpine             Up About a minute             0.0.0.0:5000-5001->5000-5001/tcp, [::]:5000-5001->5000-5001/tcp, 0.0.0.0:7000->7000/tcp, [::]:7000->7000/tcp
+apteka_pg1         apteka108-patroni:4.1.5-pg18   Up About a minute (healthy)   0.0.0.0:8008->8008/tcp, [::]:8008->8008/tcp, 0.0.0.0:5441->5432/tcp, [::]:5441->5432/tcp
+apteka_pg2         apteka108-patroni:4.1.5-pg18   Up About a minute (healthy)   0.0.0.0:5442->5432/tcp, [::]:5442->5432/tcp, 0.0.0.0:8009->8008/tcp, [::]:8009->8008/tcp
+apteka_pg3         apteka108-patroni:4.1.5-pg18   Up About a minute (healthy)   0.0.0.0:5443->5432/tcp, [::]:5443->5432/tcp, 0.0.0.0:8010->8008/tcp, [::]:8010->8008/tcp
+apteka_pgbouncer   edoburu/pgbouncer:v1.25.2-p0   Up About a minute             5432/tcp, 0.0.0.0:6432->6432/tcp, [::]:6432->6432/tcp
+
+[01:05:54.196] >>> PostgreSQL
+PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+
+[01:05:54.421] >>> Patroni
+patroni 4.1.5
+
+[01:05:54.945] >>> кластер
++ Cluster: apteka108 (7697390056828444704) +-------------+-----+------------+-----+
+| Member | Host | Role    | State     | TL | Receive LSN | Lag | Replay LSN | Lag |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+| pg1    | pg1  | Replica | streaming |  1 |  0/10000000 |   0 |  0/FFFFFA0 |   0 |
+| pg2    | pg2  | Leader  | running   |  1 |             |     |            |     |
+| pg3    | pg3  | Replica | streaming |  1 |  0/10000000 |   0 |  0/FFFFFA0 |   0 |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+
+[01:05:55.640] >>> конфигурация DCS
+loop_wait: 10
+maximum_lag_on_failover: 1048576
+postgresql:
+  parameters:
+    hot_standby: 'on'
+    hot_standby_feedback: 'on'
+    log_timezone: UTC
+    max_connections: 100
+    max_replication_slots: 10
+    max_slot_wal_keep_size: 1GB
+    max_wal_senders: 10
+    password_encryption: scram-sha-256
+    timezone: UTC
+    wal_keep_size: 128MB
+    wal_level: logical
+  use_pg_rewind: true
+  use_slots: true
+retry_timeout: 10
+synchronous_mode: false
+ttl: 30
+
+
+[01:05:56.686] >>> etcd
++-------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|     ENDPOINT      |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++-------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| http://etcd3:2379 | 61b023a06b40f588 |  3.5.21 |   41 kB |     false |      false |         2 |        103 |                103 |        |
+| http://etcd1:2379 | a2ba1ce55b8f439e |  3.5.21 |   41 kB |     false |      false |         2 |        103 |                103 |        |
+| http://etcd2:2379 | d8eb76a05ebdff97 |  3.5.21 |   41 kB |      true |      false |         2 |        103 |                103 |        |
++-------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+

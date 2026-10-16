@@ -1,0 +1,142 @@
+=== e6_etcd  2026-10-17 01:31:08 MSK  host=MatveyNovikov
+
+[01:31:09.057] >>> до эксперимента
++ Cluster: apteka108 (7697390056828444704) +-------------+-----+------------+-----+
+| Member | Host | Role    | State     | TL | Receive LSN | Lag | Replay LSN | Lag |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+| pg1    | pg1  | Replica | streaming |  9 |  0/1746ED40 |   0 | 0/1746ED40 |   0 |
+| pg2    | pg2  | Replica | streaming |  9 |  0/1746ED40 |   0 | 0/1746ED40 |   0 |
+| pg3    | pg3  | Leader  | running   |  9 |             |     |            |     |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
++-------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|     ENDPOINT      |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++-------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| http://etcd3:2379 | 61b023a06b40f588 |  3.5.21 |  164 kB |     false |      false |         5 |       1193 |               1193 |        |
+| http://etcd1:2379 | a2ba1ce55b8f439e |  3.5.21 |  164 kB |      true |      false |         5 |       1193 |               1193 |        |
+| http://etcd2:2379 | d8eb76a05ebdff97 |  3.5.21 |  164 kB |     false |      false |         5 |       1193 |               1193 |        |
++-------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+
+[01:31:19.932] >>> docker stop apteka_etcd3  (остаётся 2 из 3 - кворум есть)
+apteka_etcd3
+
+[01:32:01.483] >>> кластер при 2 из 3 узлах etcd
+2026-10-16 22:32:02,105 - WARNING - failed to resolve host etcd3: [Errno -2] Name or service not known
+2026-10-16 22:32:02,105 - ERROR - Failed to get list of machines from http://etcd3:2379/v3beta: MaxRetryError('HTTPConnectionPool(host=\'etcd3\', port=2379): Max retries exceeded with url: /version (Caused by NewConnectionError("HTTPConnection(host=\'etcd3\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:32:02,169 - WARNING - failed to resolve host etcd3: [Errno -2] Name or service not known
++ Cluster: apteka108 (7697390056828444704) +-------------+-----+------------+-----+
+| Member | Host | Role    | State     | TL | Receive LSN | Lag | Replay LSN | Lag |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+| pg1    | pg1  | Replica | streaming |  9 |  0/1804F390 |   0 | 0/1804F390 |   0 |
+| pg2    | pg2  | Replica | streaming |  9 |  0/1804F460 |   0 | 0/1804F390 |   0 |
+| pg3    | pg3  | Leader  | running   |  9 |             |     |            |     |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+
+[01:32:02.288] >>> docker stop apteka_etcd2  (остаётся 1 из 3 - кворума нет)
+apteka_etcd2
+
+[01:33:13.922] >>> кластер без кворума DCS (patronictl list читает etcd - ожидаем ошибку)
+2026-10-16 22:33:16,458 - ERROR - Failed to get list of machines from http://etcd2:2379/v3beta: MaxRetryError('HTTPConnectionPool(host=\'etcd2\', port=2379): Max retries exceeded with url: /version (Caused by NewConnectionError("HTTPConnection(host=\'etcd2\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:33:16,595 - ERROR - Request to server http://etcd2:2379 failed: MaxRetryError('HTTPConnectionPool(host=\'etcd2\', port=2379): Max retries exceeded with url: /v3/kv/range (Caused by NewConnectionError("HTTPConnection(host=\'etcd2\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:33:17,245 - ERROR - Request to server http://etcd3:2379 failed: MaxRetryError('HTTPConnectionPool(host=\'etcd3\', port=2379): Max retries exceeded with url: /v3/kv/range (Caused by NewConnectionError("HTTPConnection(host=\'etcd3\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:33:20,586 - ERROR - Request to server http://etcd1:2379 failed: ReadTimeoutError("HTTPConnectionPool(host='etcd1', port=2379): Read timed out. (read timeout=3.3320517653335933)")
+2026-10-16 22:33:24,608 - ERROR - Failed to get list of machines from http://etcd2:2379/v3: MaxRetryError('HTTPConnectionPool(host=\'etcd2\', port=2379): Max retries exceeded with url: /v3/cluster/member/list (Caused by NewConnectionError("HTTPConnection(host=\'etcd2\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:33:26,833 - ERROR - Request to server http://etcd2:2379 failed: MaxRetryError('HTTPConnectionPool(host=\'etcd2\', port=2379): Max retries exceeded with url: /v3/kv/range (Caused by NewConnectionError("HTTPConnection(host=\'etcd2\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:33:30,892 - ERROR - Failed to get list of machines from http://etcd2:2379/v3: MaxRetryError('HTTPConnectionPool(host=\'etcd2\', port=2379): Max retries exceeded with url: /v3/cluster/member/list (Caused by NewConnectionError("HTTPConnection(host=\'etcd2\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+    ret = super(PatroniEtcd3Client, self).call_rpc(method, fields, retry)
+pg1: replica running dcs_last_seen= 1792189998
+pg2: replica running dcs_last_seen= 1792189997
+pg3: replica running dcs_last_seen= 1792189997
+
+[01:33:31.604] >>> лог Patroni (pg1) после потери кворума
+2026-10-16 22:32:08,348 INFO: Lock owner: pg3; I am pg1
+2026-10-16 22:32:11,687 ERROR: Request to server http://etcd1:2379 failed: ReadTimeoutError("HTTPConnectionPool(host='etcd1', port=2379): Read timed out. (read timeout=3.333197820333529)")
+2026-10-16 22:32:11,687 INFO: Reconnection allowed, looking for another server.
+2026-10-16 22:32:11,687 INFO: Retrying on http://etcd2:2379
+2026-10-16 22:32:13,357 ERROR: Request to server http://etcd2:2379 failed: MaxRetryError("HTTPConnectionPool(host='etcd2', port=2379): Max retries exceeded with url: /v3/lease/keepalive (Caused by ConnectTimeoutError(<HTTPConnection(host='etcd2', port=2379) at 0x7fa01a360380>, 'Connection to etcd2 timed out. (connect timeout=1.6666666666666667)'))")
+2026-10-16 22:32:13,357 INFO: Reconnection allowed, looking for another server.
+2026-10-16 22:32:13,357 INFO: Retrying on http://etcd3:2379
+2026-10-16 22:32:15,024 ERROR: Request to server http://etcd3:2379 failed: MaxRetryError("HTTPConnectionPool(host='etcd3', port=2379): Max retries exceeded with url: /v3/lease/keepalive (Caused by ConnectTimeoutError(<HTTPConnection(host='etcd3', port=2379) at 0x7fa01a363130>, 'Connection to etcd3 timed out. (connect timeout=1.6666666666666667)'))")
+2026-10-16 22:32:15,024 INFO: Reconnection allowed, looking for another server.
+2026-10-16 22:32:15,036 WARNING: failed to resolve host etcd3: [Errno -2] Name or service not known
+2026-10-16 22:32:15,037 ERROR: Failed to get list of machines from http://etcd3:2379/v3: MaxRetryError('HTTPConnectionPool(host=\'etcd3\', port=2379): Max retries exceeded with url: /v3/cluster/member/list (Caused by NewConnectionError("HTTPConnection(host=\'etcd3\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:32:18.526 UTC [1316] LOG:  replication terminated by primary server
+2026-10-16 22:32:18.526 UTC [1316] DETAIL:  End of WAL reached on timeline 9 at 0/181F4180.
+2026-10-16 22:32:18.526 UTC [1316] FATAL:  could not send end-of-streaming message to primary: server closed the connection unexpectedly
+2026-10-16 22:32:18.527 UTC [52] LOG:  record with incorrect prev-link 2FF/10 at 0/181F4180
+2026-10-16 22:32:18.536 UTC [1554] FATAL:  streaming replication receiver "apteka108" could not connect to the primary server: connection to server at "pg3" (10.42.0.13), port 5432 failed: FATAL:  the database system is shutting down
+2026-10-16 22:32:18.537 UTC [52] LOG:  waiting for WAL to become available at 0/181F4198
+2026-10-16 22:32:19,056 WARNING: failed to resolve host etcd2: [Errno -2] Name or service not known
+2026-10-16 22:32:19,057 ERROR: Failed to get list of machines from http://etcd2:2379/v3: MaxRetryError('HTTPConnectionPool(host=\'etcd2\', port=2379): Max retries exceeded with url: /v3/cluster/member/list (Caused by NewConnectionError("HTTPConnection(host=\'etcd2\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:32:19,063 ERROR: 
+2026-10-16 22:32:19,072 ERROR: watchprefix failed: ProtocolError('Response ended prematurely')
+2026-10-16 22:32:19,083 WARNING: Loop time exceeded, rescheduling immediately.
+2026-10-16 22:32:19,104 WARNING: failed to resolve host etcd3: [Errno -2] Name or service not known
+2026-10-16 22:32:19,105 WARNING: failed to resolve host etcd3: [Errno -2] Name or service not known
+2026-10-16 22:32:19,106 ERROR: Failed to get list of machines from http://etcd3:2379/v3: MaxRetryError('HTTPConnectionPool(host=\'etcd3\', port=2379): Max retries exceeded with url: /v3/cluster/member/list (Caused by NewConnectionError("HTTPConnection(host=\'etcd3\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:32:20,482 WARNING: failed to resolve host etcd2: [Errno -2] Name or service not known
+2026-10-16 22:32:20,483 ERROR: Failed to get list of machines from http://etcd2:2379/v3: MaxRetryError('HTTPConnectionPool(host=\'etcd2\', port=2379): Max retries exceeded with url: /v3/cluster/member/list (Caused by NewConnectionError("HTTPConnection(host=\'etcd2\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:32:20,488 WARNING: failed to resolve host etcd2: [Errno -2] Name or service not known
+2026-10-16 22:32:21,514 WARNING: failed to resolve host etcd3: [Errno -2] Name or service not known
+2026-10-16 22:32:22,541 WARNING: failed to resolve host etcd2: [Errno -2] Name or service not known
+
+[01:33:31.660] >>> docker start apteka_etcd2 apteka_etcd3
+apteka_etcd2
+apteka_etcd3
+writeloop: 35077 attempts -> docs/failover/raw/e6_writeloop.csv
+writeloop: 336 attempts -> docs/failover/raw/e6_readloop.csv
+
+[01:34:00.118] >>> запись (через PgBouncer)
+файл: docs/failover/raw/e6_writeloop.csv
+интервал: 01:31:09.979 - 01:33:59.978 (170.0 c)
+попыток: 35077, успешных: 34853, ошибок: 224
+TPS (успешные / длительность): 205.0
+задержка записи: медиана 2.5 мс, p95 3.1 мс, max 36.0 мс
+узлы, обслужившие запись (по порядку): 10.42.0.13/32 (34853)
+
+окно недоступности #1:
+  последняя успешная запись:   01:32:18.447  id=221498 узел=10.42.0.13/32
+  первая ошибка:               01:32:18.447  server closed the connection unexpectedly
+  первая успешная после:       01:33:38.315  id=221499 узел=10.42.0.13/32
+  отклонённых попыток: 224
+     213 x server closed the connection unexpectedly
+      11 x cannot execute INSERT in a read-only transaction
+  RTO (окно недоступности записи): 79.87 c
+
+подтверждённых транзакций: 34853, найдено в базе после теста: 34853, потеряно: 0
+  max(id) в базе: 230272; max подтверждённый id: 230272
+
+[01:34:00.328] >>> чтение (через HAProxy :5001)
+файл: docs/failover/raw/e6_readloop.csv
+интервал: 01:31:09.978 - 01:33:59.607 (169.6 c)
+попыток: 336, успешных: 336, ошибок: 0
+TPS (успешные / длительность): 2.0
+задержка записи: медиана 1.5 мс, p95 14.6 мс, max 16.7 мс
+узлы, обслужившие запись (по порядку): 10.42.0.11/32 (replica) (336)
+окон недоступности нет
+
+[01:34:00.390] >>> после возврата etcd
++ Cluster: apteka108 (7697390056828444704) +-------------+-----+------------+-----+
+| Member | Host | Role    | State     | TL | Receive LSN | Lag | Replay LSN | Lag |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+| pg1    | pg1  | Replica | streaming | 10 |  0/1835DB68 |   0 | 0/1835DA98 |   0 |
+| pg2    | pg2  | Replica | streaming | 10 |  0/1835DB68 |   0 | 0/1835DA98 |   0 |
+| pg3    | pg3  | Leader  | running   | 10 |             |     |            |     |
++--------+------+---------+-----------+----+-------------+-----+------------+-----+
+
+[01:34:01.088] >>> лог Patroni (pg1) после возврата etcd
+2026-10-16 22:33:31,865 WARNING: failed to resolve host etcd2: [Errno -2] Name or service not known
+2026-10-16 22:33:34.311 UTC [1562] LOG:  replication terminated by primary server
+2026-10-16 22:33:34.311 UTC [1562] DETAIL:  End of WAL reached on timeline 9 at 0/181F4180.
+2026-10-16 22:33:34.311 UTC [1562] LOG:  fetching timeline history file for timeline 10 from primary server
+2026-10-16 22:33:34.338 UTC [52] LOG:  new target timeline is 10
+2026-10-16 22:33:34.339 UTC [1562] LOG:  restarted WAL streaming at 0/18000000 on timeline 10
+2026-10-16 22:33:36,226 WARNING: failed to resolve host etcd3: [Errno -2] Name or service not known
+2026-10-16 22:33:36,227 ERROR: Failed to get list of machines from http://etcd3:2379/v3: MaxRetryError('HTTPConnectionPool(host=\'etcd3\', port=2379): Max retries exceeded with url: /v3/cluster/member/list (Caused by NewConnectionError("HTTPConnection(host=\'etcd3\', port=2379): Failed to establish a new connection: getaddrinfo returns an empty list"))')
+2026-10-16 22:33:36,236 ERROR: 
+2026-10-16 22:33:36,244 ERROR: watchprefix failed: ProtocolError('Response ended prematurely')
+2026-10-16 22:33:36,249 WARNING: Loop time exceeded, rescheduling immediately.
+2026-10-16 22:33:36,263 INFO: Lock owner: pg3; I am pg1
+2026-10-16 22:33:36,278 INFO: Local timeline=10 lsn=0/181F42C0
+2026-10-16 22:33:36,292 INFO: primary_timeline=10
+
+моменты: etcd3 stop=2026-10-17T01:31:19+03:00  etcd2 stop=2026-10-17T01:32:02+03:00  etcd start=2026-10-17T01:33:31+03:00
